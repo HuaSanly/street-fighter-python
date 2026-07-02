@@ -1,0 +1,434 @@
+{
+ "ryu": {
+  "dir": "ryu",
+  "animations": {
+   "idle": {
+    "file": "idle.png",
+    "frames": 6,
+    "fw": 57,
+    "fh": 106,
+    "delay": 9,
+    "loop": true,
+    "interruptible": true
+   },
+   "parry_f": {
+    "file": "parry_f.png",
+    "frames": 8,
+    "fw": 70,
+    "fh": 110,
+    "delay": 7,
+    "loop": true,
+    "interruptible": true
+   },
+   "parry_b": {
+    "file": "parry_b.png",
+    "frames": 8,
+    "fw": 70,
+    "fh": 108,
+    "delay": 7,
+    "loop": true,
+    "interruptible": true
+   },
+   "jump": {
+    "file": "jump.png",
+    "frames": 11,
+    "fw": 70,
+    "fh": 154,
+    "delay": 9,
+    "next": "idle",
+    "sequence": [
+     0,
+     0,
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8
+    ]
+   },
+   "front_flip": {
+    "file": "front_flip.png",
+    "frames": 8,
+    "fw": 88,
+    "fh": 129,
+    "delay": 6,
+    "next": "idle"
+   },
+   "back_flip": {
+    "file": "back_flip.png",
+    "frames": 8,
+    "fw": 88,
+    "fh": 129,
+    "delay": 6,
+    "next": "idle"
+   },
+   "punch": {
+    "file": "punch.png",
+    "frames": 6,
+    "fw": 101,
+    "fh": 102,
+    "delay": 6,
+    "next": "idle"
+   },
+   "quick_punch": {
+    "file": "quick_punch.png",
+    "frames": 3,
+    "fw": 94,
+    "fh": 102,
+    "delay": 5,
+    "next": "idle"
+   },
+   "uppercut": {
+    "file": "uppercut.png",
+    "frames": 9,
+    "fw": 83,
+    "fh": 111,
+    "delay": 6,
+    "next": "idle"
+   },
+   "kick_low": {
+    "file": "kick_low.png",
+    "frames": 5,
+    "fw": 115,
+    "fh": 111,
+    "delay": 7,
+    "next": "idle"
+   },
+   "upper_kick": {
+    "file": "upper_kick.png",
+    "frames": 9,
+    "fw": 110,
+    "fh": 111,
+    "delay": 6,
+    "next": "idle"
+   },
+   "air_punch": {
+    "file": "air_punch.png",
+    "frames": 6,
+    "fw": 83,
+    "fh": 95,
+    "delay": 7,
+    "next": "jump"
+   },
+   "air_kick": {
+    "file": "air_kick.png",
+    "frames": 5,
+    "fw": 99,
+    "fh": 94,
+    "delay": 8,
+    "next": "jump"
+   },
+   "punch_down": {
+    "file": "punch_down.png",
+    "frames": 4,
+    "fw": 75,
+    "fh": 90,
+    "delay": 8,
+    "next": "jump"
+   },
+   "hit_stand": {
+    "file": "hit_stand.png",
+    "frames": 1,
+    "fw": 62,
+    "fh": 103,
+    "delay": 9,
+    "next": "idle"
+   },
+   "hit_stand_back": {
+    "file": "hit_stand_b.png",
+    "frames": 4,
+    "fw": 77,
+    "fh": 104,
+    "delay": 7,
+    "next": "idle"
+   },
+   "knockback": {
+    "file": "knockback.png",
+    "frames": 4,
+    "fw": 122,
+    "fh": 104,
+    "delay": 9,
+    "next": "recover"
+   },
+   "recover": {
+    "file": "recover.png",
+    "frames": 5,
+    "fw": 95,
+    "fh": 104,
+    "delay": 7,
+    "next": "idle"
+   },
+   "win": {
+    "file": "win.png",
+    "frames": 10,
+    "fw": 73,
+    "fh": 148,
+    "delay": 12,
+    "hold": true
+   },
+   "dead": {
+    "file": "dead.png",
+    "frames": 1,
+    "fw": 116,
+    "fh": 46,
+    "delay": 9,
+    "hold": true
+   },
+   "crouch": {
+    "file": "crouch.png",
+    "frames": 1,
+    "fw": 54,
+    "delay": 9,
+    "hold": true
+   },
+   "crouch_punch": {
+    "file": "crouch_punch.png",
+    "frames": 3,
+    "fw": 86,
+    "delay": 5,
+    "next": "crouch"
+   },
+   "crouch_attack": {
+    "file": "crouch_attack.png",
+    "frames": 8,
+    "fw": 126,
+    "delay": 6,
+    "next": "crouch"
+   },
+   "crouch_hit": {
+    "file": "crouch_hit.png",
+    "frames": 1,
+    "fw": 67,
+    "delay": 9,
+    "next": "crouch"
+   },
+   "crouch_hit_b": {
+    "file": "crouch_hit_b.png",
+    "frames": 4,
+    "fw": 88,
+    "delay": 7,
+    "next": "crouch"
+   }
+  }
+ },
+ "ken": {
+  "dir": "ken",
+  "animations": {
+   "idle": {
+    "file": "idle.png",
+    "frames": 6,
+    "fw": 57,
+    "fh": 106,
+    "delay": 9,
+    "loop": true,
+    "interruptible": true
+   },
+   "parry_f": {
+    "file": "parry_f.png",
+    "frames": 8,
+    "fw": 70,
+    "fh": 110,
+    "delay": 7,
+    "loop": true,
+    "interruptible": true
+   },
+   "parry_b": {
+    "file": "parry_b.png",
+    "frames": 8,
+    "fw": 70,
+    "fh": 110,
+    "delay": 7,
+    "loop": true,
+    "interruptible": true
+   },
+   "jump": {
+    "file": "jump.png",
+    "frames": 11,
+    "fw": 61,
+    "fh": 124,
+    "delay": 9,
+    "next": "idle",
+    "sequence": [
+     0,
+     0,
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8
+    ]
+   },
+   "front_flip": {
+    "file": "front_flip.png",
+    "frames": 8,
+    "fw": 83,
+    "fh": 125,
+    "delay": 6,
+    "next": "idle"
+   },
+   "back_flip": {
+    "file": "back_flip.png",
+    "frames": 8,
+    "fw": 83,
+    "fh": 125,
+    "delay": 6,
+    "next": "idle"
+   },
+   "punch": {
+    "file": "punch.png",
+    "frames": 8,
+    "fw": 103,
+    "fh": 103,
+    "delay": 5,
+    "next": "idle"
+   },
+   "quick_punch": {
+    "file": "quick_punch.png",
+    "frames": 4,
+    "fw": 95,
+    "fh": 102,
+    "delay": 5,
+    "next": "idle"
+   },
+   "uppercut": {
+    "file": "uppercut.png",
+    "frames": 8,
+    "fw": 90,
+    "fh": 108,
+    "delay": 6,
+    "next": "idle"
+   },
+   "kick_low": {
+    "file": "kick_low.png",
+    "frames": 5,
+    "fw": 118,
+    "fh": 105,
+    "delay": 7,
+    "next": "idle"
+   },
+   "upper_kick": {
+    "file": "upper_kick.png",
+    "frames": 10,
+    "fw": 135,
+    "fh": 108,
+    "delay": 6,
+    "next": "idle"
+   },
+   "air_punch": {
+    "file": "air_punch.png",
+    "frames": 7,
+    "fw": 84,
+    "fh": 95,
+    "delay": 6,
+    "next": "jump"
+   },
+   "air_kick": {
+    "file": "air_kick.png",
+    "frames": 6,
+    "fw": 106,
+    "fh": 83,
+    "delay": 7,
+    "next": "jump"
+   },
+   "punch_down": {
+    "file": "punch_down.png",
+    "frames": 4,
+    "fw": 68,
+    "fh": 88,
+    "delay": 8,
+    "next": "jump"
+   },
+   "hit_stand": {
+    "file": "hit_stand.png",
+    "frames": 1,
+    "fw": 64,
+    "fh": 104,
+    "delay": 9,
+    "next": "idle"
+   },
+   "hit_stand_back": {
+    "file": "hit_stand_b.png",
+    "frames": 4,
+    "fw": 79,
+    "fh": 104,
+    "delay": 7,
+    "next": "idle"
+   },
+   "knockback": {
+    "file": "knockback.png",
+    "frames": 4,
+    "fw": 110,
+    "fh": 104,
+    "delay": 9,
+    "next": "recover"
+   },
+   "recover": {
+    "file": "recover.png",
+    "frames": 5,
+    "fw": 95,
+    "fh": 104,
+    "delay": 7,
+    "next": "idle"
+   },
+   "win": {
+    "file": "win.png",
+    "frames": 10,
+    "fw": 70,
+    "fh": 144,
+    "delay": 12,
+    "hold": true
+   },
+   "dead": {
+    "file": "dead.png",
+    "frames": 1,
+    "fw": 116,
+    "fh": 46,
+    "delay": 9,
+    "hold": true
+   },
+   "crouch": {
+    "file": "crouch.png",
+    "frames": 1,
+    "fw": 54,
+    "delay": 9,
+    "hold": true
+   },
+   "crouch_punch": {
+    "file": "crouch_punch.png",
+    "frames": 3,
+    "fw": 89,
+    "delay": 5,
+    "next": "crouch"
+   },
+   "crouch_attack": {
+    "file": "crouch_attack.png",
+    "frames": 5,
+    "fw": 132,
+    "delay": 7,
+    "next": "crouch"
+   },
+   "crouch_hit": {
+    "file": "crouch_hit.png",
+    "frames": 1,
+    "fw": 67,
+    "delay": 9,
+    "next": "crouch"
+   },
+   "crouch_hit_b": {
+    "file": "crouch_hit_b.png",
+    "frames": 4,
+    "fw": 80,
+    "delay": 7,
+    "next": "crouch"
+   }
+  }
+ }
+}
