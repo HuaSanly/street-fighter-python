@@ -14,7 +14,7 @@ from .combat import (ATTACKS, SPECIALS, SHORYUKEN_RISE, SHORYUKEN_DRIFT,
 
 AIR_ANIMS = ("jump", "front_flip", "back_flip", "air_punch", "air_kick", "punch_down")
 CROUCH_ANIMS = ("crouch", "crouch_punch", "crouch_attack", "crouch_hit", "crouch_hit_b")
-CROUCH_HURTBOX_H = 130   # high attacks whiff over a crouching fighter
+CROUCH_HURTBOX_H = 130 
 
 
 class Fighter:
@@ -47,10 +47,10 @@ class Fighter:
         # special-move input buffer: (direction token, age) entries
         self.age = 0
         self.dir_history = deque(maxlen=24)
-        self.special = None          # "hadouken" | "shoryuken" while active
+        self.special = None           # "hadouken" | "shoryuken" while active
         self.fireball_active = False  # set by the scene: own fireball on screen
 
-    # ------------------------------------------------------------------ round
+    # Round
     def reset(self):
         self.x = float(self.start_x)
         self.y = float(config.GROUND_Y)
@@ -76,7 +76,7 @@ class Fighter:
         self.attack = None
         self.anim.set("win", force=True)
 
-    # ----------------------------------------------------------------- update
+    # Update
     def update(self, held, pressed, opponent):
         self.age += 1
         if self.flash:
@@ -213,7 +213,7 @@ class Fighter:
             self.special = None
             self.attack = None
             self.vx = 0
-            self.blockstun = SHORYUKEN_LANDING_LAG  # whiffed DPs are punishable
+            self.blockstun = SHORYUKEN_LANDING_LAG
             self.anim.set("idle", force=True)
             return
         if self.anim.name in AIR_ANIMS:
@@ -221,7 +221,7 @@ class Fighter:
             self.vx = 0
             self.anim.set("idle", force=True)
 
-    # ---------------------------------------------------------------- attacks
+    # Attacks
     def _record_direction(self, held):
         """Track direction changes (relative to facing) for motion inputs."""
         c = self.controls
@@ -284,7 +284,7 @@ class Fighter:
             if c["lp"] in pressed or c["hp"] in pressed:
                 choice = "crouch_punch"
             elif c["lk"] in pressed or c["hk"] in pressed:
-                choice = "crouch_attack"   # sweep: knocks down
+                choice = "crouch_attack"             # sweep: knocks down
         elif c["lp"] in pressed:
             choice = "air_punch" if not self.on_ground else "quick_punch"
         elif c["hp"] in pressed:
@@ -372,7 +372,7 @@ class Fighter:
             self.hitstun = atk.hitstun
         return "hit"
 
-    # ------------------------------------------------------------------- draw
+    # Draw
     def draw(self, surf, offset=(0, 0)):
         ox, oy = offset
         # soft drop shadow on the floor

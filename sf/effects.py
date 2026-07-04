@@ -1,9 +1,3 @@
-"""Visual juice: particle hit sparks, expanding impact rings and screen shake.
-
-The fight scene also uses hitstop (a few frozen ticks on every connected hit)
-which is what makes hits feel weighty; that timer lives in the scene, the
-drawable effects live here.
-"""
 import math
 import random
 

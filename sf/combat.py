@@ -1,9 +1,3 @@
-"""Combat frame data.
-
-Ported from the Java CombatSystem but expressed in fixed 60 Hz ticks with
-explicit hitbox geometry per attack. `reach` extends forward from the
-fighter's center; `y` is the hitbox center measured up from the feet.
-"""
 from dataclasses import dataclass
 
 
@@ -26,16 +20,16 @@ class Attack:
 
 
 ATTACKS = {
-    # Ground lights — fast, cancellable
+    # Ground lights
     "quick_punch": Attack("quick_punch", 4, 6, 12, 14, 9, 4.0, 110, 165, 52, cancel=True),
     "kick_low":    Attack("kick_low",    6, 6, 18, 16, 10, 5.0, 155, 55, 55, cancel=True, sound="kick"),
 
-    # Ground heavies — slower, bigger payoff
+    # Ground heavies
     "punch":       Attack("punch",      8, 6, 25, 20, 12, 7.0, 145, 165, 58, heavy=True),
     "uppercut":    Attack("uppercut",   7, 7, 30, 24, 12, 7.5, 115, 180, 95, heavy=True),
     "upper_kick":  Attack("upper_kick", 10, 8, 35, 26, 14, 9.0, 165, 170, 85, heavy=True, sound="kick"),
 
-    # Crouch attacks — punches whiff on crouchers, so these hit low
+    # Crouch attacks
     "crouch_punch":  Attack("crouch_punch",  4, 5, 12, 14, 8, 3.5, 115, 95, 50, cancel=True),
     "crouch_attack": Attack("crouch_attack", 8, 6, 24, 26, 12, 6.5, 155, 35, 50, heavy=True, sound="kick"),
 
@@ -58,6 +52,6 @@ SHORYUKEN_RISE = -19.0     # initial vertical velocity
 SHORYUKEN_DRIFT = 4.5      # forward velocity while rising
 SHORYUKEN_LANDING_LAG = 12
 
-HITSTOP_LIGHT = 6    # frozen ticks on a connected light hit
+HITSTOP_LIGHT = 6          # frozen ticks on a connected light hit
 HITSTOP_HEAVY = 11
 HITSTOP_BLOCK = 4

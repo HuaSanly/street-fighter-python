@@ -94,23 +94,15 @@ street-fighter-python/
 Adding a character is data-driven: drop sprite sheets in `assets/images/<name>/`
 and describe them in `sf/data/characters.json` — no engine changes needed.
 
-## 🗺️ Roadmap
 
-- [ ] AI opponent for single player
-- [ ] More characters
-- [ ] Online multiplayer (rollback-friendly: the engine is already deterministic)
-- [ ] Training mode
-
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - Inspired by Capcom's Street Fighter series
 - Sprite assets from [OpenGameArt](https://opengameart.org/), sounds from
   [FreeSound](https://freesound.org/)
 - Originally built in JavaFX by the same authors; this is the Python rewrite
 
-## 👨‍💻 Authors
+## Authors
 
 - [Kabir](https://github.com/daicarus)
 - [Nihan](https://github.com/Nihan2609)
-
-**Made with ❤️ and 🐍 by Nihan & Kabir**

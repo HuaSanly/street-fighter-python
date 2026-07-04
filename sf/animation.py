@@ -1,8 +1,4 @@
 """Tick-based animation player.
-
-Unlike the Java version (wall-clock milliseconds), everything counts fixed
-60 Hz ticks, so animation, combat frame data and physics stay in lockstep and
-never drift.
 """
 
 

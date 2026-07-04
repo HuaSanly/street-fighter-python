@@ -1,7 +1,4 @@
 """Global configuration: paths, display, physics and gameplay constants.
-
-All speeds/forces are per-tick at a fixed 60 ticks/second, scaled 2x from the
-original Java values because sprites render at SPRITE_SCALE = 2.
 """
 from pathlib import Path
 
@@ -18,7 +15,6 @@ FPS = 60
 SPRITE_SCALE = 2
 
 # Physics (Java: gravity 0.6, move 4, air 2.5, jump -14 — doubled for 2x scale,
-# gravity slightly under 2x so jumps hang a touch longer and feel better)
 GROUND_Y = 488
 STAGE_MARGIN = 70
 GRAVITY = 1.1

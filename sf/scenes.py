@@ -62,7 +62,7 @@ class Scene:
         pass
 
 
-# ------------------------------------------------------------------- MENU ---
+# --- MENU ---
 class MenuScene(Scene):
     def __init__(self, game):
         super().__init__(game)
@@ -110,7 +110,7 @@ class MenuScene(Scene):
         surf.blit(hint, (config.CANVAS_W / 2 - hint.get_width() / 2, config.CANVAS_H - 40))
 
 
-# --------------------------------------------------------------- CHAR SELECT
+# CHAR SELECT
 class CharSelectScene(Scene):
     CHARS = ["ryu", "ken"]
 
@@ -219,7 +219,7 @@ class CharSelectScene(Scene):
             surf.blit(vs, (config.CANVAS_W / 2 - vs.get_width() / 2, 400))
 
 
-# ---------------------------------------------------------------- MAP SELECT
+# MAP SELECT
 class MapSelectScene(Scene):
     THUMB = (250, 130)
 
@@ -290,7 +290,7 @@ class MapSelectScene(Scene):
         surf.blit(hint, (config.CANVAS_W / 2 - hint.get_width() / 2, config.CANVAS_H - 32))
 
 
-# --------------------------------------------------------------------- FIGHT
+# FIGHT
 class FightScene(Scene):
     def __init__(self, game, p1_char, p2_char, map_index):
         super().__init__(game)
@@ -320,7 +320,7 @@ class FightScene(Scene):
         self.tick = 0
         a.music("fight_theme.wav", 0.4)
 
-    # ----------------------------------------------------------------- input
+    # Input
     def handle(self, events, held):
         self.held = held
         self.pressed = set()
@@ -343,7 +343,7 @@ class FightScene(Scene):
         if self.paused:
             self.pressed = set()
 
-    # ---------------------------------------------------------------- update
+    # Update
     def update(self):
         if self.paused:
             return
@@ -575,7 +575,7 @@ class FightScene(Scene):
         self.state = "intro"
         self.t = 0
 
-    # ------------------------------------------------------------------ draw
+    # Draw
     def draw(self, surf):
         surf.fill((0, 0, 0))
         ox, oy = self.effects.offset()

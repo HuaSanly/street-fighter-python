@@ -1,9 +1,3 @@
-"""Asset loading: sprite sheets (data-driven from characters.json), animated
-GIF backgrounds (via Pillow), sounds, music and fonts.
-
-Every character frame is sliced, scaled and pre-mirrored once at load time so
-the game loop never transforms surfaces.
-"""
 import json
 
 import pygame
@@ -66,7 +60,7 @@ class Assets:
         self._load_sounds()
         self._load_images()
 
-    # ------------------------------------------------------------- characters
+    # Characters
     def _load_characters(self):
         data = json.loads((config.DATA_DIR / "characters.json").read_text())
         for char, cdata in data.items():
@@ -102,7 +96,7 @@ class Assets:
                 }
             self.characters[char] = anims
 
-    # ----------------------------------------------------------------- sounds
+    # Sounds
     def _load_sounds(self):
         for wav in config.SND_DIR.glob("*.wav"):
             try:
@@ -128,7 +122,7 @@ class Assets:
             pygame.mixer.music.set_volume(volume)
             pygame.mixer.music.play(-1 if loop else 0)
 
-    # ----------------------------------------------------------------- images
+    # Images
     def _load_images(self):
         for name in ("logo.jpg", "ryuSelect.png", "kenSelect.png",
                      "ryu_name.png", "ken_name.png", "LogInBG.jpg"):
@@ -157,7 +151,7 @@ class Assets:
         frames, durations = self._gif(config.IMG_DIR / f"map{index}.gif", size)
         return AnimatedBG(frames, durations)
 
-    # ------------------------------------------------------------------ fonts
+    # Fonts
     def font(self, size):
         if size not in self._fonts:
             self._fonts[size] = pygame.font.Font(str(config.FONT_PATH), size)
