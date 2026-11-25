@@ -1,7 +1,7 @@
 # 🥊 Street Fighter — Python Edition
 
 A 2D fighting game inspired by Street Fighter, built with **pygame-ce**.
-Local two-player battles with Ryu and Ken, six animated stages, motion-input
+Battles with Ryu and Ken, six animated stages, motion-input
 special moves (Hadouken! Shoryuken!), and a combat system with real frame
 data, hitboxes, and cancels.
 
@@ -30,6 +30,7 @@ Requires Python 3.10+. Dependencies: `pygame-ce`, `pillow`.
 ## ✨ Features
 
 - **Two fighters** — Ryu and Ken, with full sprite animation sets
+- **Three match modes** — Player vs Player, AI vs Player, and AI vs AI
 - **Special moves** — Hadouken (↓ ↘ → + P) fires a glowing projectile
   (blue for Ryu, orange for Ken); Shoryuken (→ ↓ → + P) is a rising
   knockdown uppercut with landing lag on whiff. Fireballs cancel each other
@@ -44,6 +45,25 @@ Requires Python 3.10+. Dependencies: `pygame-ce`, `pillow`.
   motion, health bars with damage trails, springy announcer text
 - **Deterministic engine** — fixed 60 Hz tick for physics, animation and
   combat; vsync'd rendering
+
+## Match setup
+
+On the main menu, use Left/Right to choose a mode and Up/Down to move between
+settings. Press Enter to continue to fighter and stage selection.
+
+| Mode | Setup |
+|------|-------|
+| Player vs Player | Both sides use the keyboard and pick their own fighters. |
+| AI vs Player | Choose the human side and the other side's bot. |
+| AI vs AI | Choose a bot independently for P1 and P2, then watch the match. |
+
+In either AI mode, use Left/Right and Enter to pick P1's fighter, then P2's.
+The bot choices are **Bot-A**, **Bot-B-Easy**, **Bot-B-Normal**, and **Bot-B-Hard**.
+The fight HUD shows each bot by name. Press **R** after the match to replay the
+same setup.
+
+Run `python -m unittest discover -s tests -v` to check the match flows and bot
+combat inputs without opening a window.
 
 ## 🎮 Controls
 
@@ -79,6 +99,9 @@ shows the full move list. After a match: `R` to rematch, `ENTER` for menu.
 street-fighter-python/
 ├── main.py              # window + vsync'd fixed-timestep game loop
 ├── assets/              # sprites, stages, sounds, music, font
+├── Bot/
+│   ├── bot_a/           # Gothicvania-inspired tactical controller
+│   └── bot_b/           # Tepelekas CPUController and its MIT notice
 └── sf/
     ├── config.py        # all tunable constants (speed, damage, health...)
     ├── assets.py        # data-driven sprite sheet loader, GIF stages
@@ -101,6 +124,11 @@ and describe them in `sf/data/characters.json` — no engine changes needed.
 - Sprite assets from [OpenGameArt](https://opengameart.org/), sounds from
   [FreeSound](https://freesound.org/)
 - Originally built in JavaFX by the same authors; this is the Python rewrite
+- Bot-A is an independent implementation of the behavior described by
+  [Gothicvania's Bot](https://github.com/DvlprHsn/Gothicvania/blob/254ec93732254bdb41456b60484c7343fe979149/entities/bot.py).
+  A forward rush into a sweep maps Gothicvania's slide to this game's move set.
+- Bot-B adapts [Tepelekas's CPUController](https://github.com/tepelekas/street-fighter-python/blob/5b90aa144fced0652e1036a0cf5205a900ee939c/cpu_controller.py).
+  Its MIT notice is included in [Bot/bot_b/LICENSE](Bot/bot_b/LICENSE).
 
 ## Authors
 

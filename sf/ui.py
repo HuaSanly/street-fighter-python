@@ -112,7 +112,7 @@ class Announcer:
 class HUD:
     def __init__(self, assets, names):
         self.assets = assets
-        self.bars = [HealthBar(0, names[0] + "  P1"), HealthBar(1, names[1] + "  P2")]
+        self.bars = [HealthBar(i, name) for i, name in enumerate(names)]
         self.combo = [0, 0]
         self.combo_pop = [0, 0]
 

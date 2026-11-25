@@ -308,12 +308,12 @@ class Fighter:
         self.anim.set(choice, force=True)
         return True
 
-    def get_hitbox(self):
-        """Active hitbox rect, or None outside the active window."""
+    def get_hitbox(self, *, ahead=0):
+        """Active hitbox at the current position, for this or a future attack tick."""
         atk = self.attack
         if not atk or self.hit_connected:
             return None
-        if not (atk.startup <= self.attack_tick < atk.startup + atk.active):
+        if not (atk.startup <= self.attack_tick + ahead < atk.startup + atk.active):
             return None
         x0 = self.x + self.facing * 22
         left = min(x0, x0 + self.facing * atk.reach)

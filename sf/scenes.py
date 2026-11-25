@@ -1,7 +1,10 @@
 """Game scenes: menu -> character select -> map select -> fight."""
+import math
 import random
 
 import pygame
+
+from Bot import BOT_NAMES, BotInput
 
 from . import config
 from .combat import (HITSTOP_LIGHT, HITSTOP_HEAVY, HITSTOP_BLOCK,
@@ -25,6 +28,7 @@ FIRE_COLORS = {"ryu": ((30, 60, 200), (80, 140, 255), (175, 215, 255)),
 
 P1_COLOR = (255, 80, 60)
 P2_COLOR = (80, 140, 255)
+HUMAN = (None, None)
 
 
 class _NoKeys:
@@ -64,7 +68,9 @@ class Scene:
 
 # --- MENU ---
 class MenuScene(Scene):
-    def __init__(self, game):
+    MODES = ("PLAYER VS PLAYER", "AI VS PLAYER", "AI VS AI")
+
+    def __init__(self, game, controllers=HUMAN):
         super().__init__(game)
         bg = self.assets.images.get("LogInBG")
         self.bg = cover(bg, (config.CANVAS_W, config.CANVAS_H)) if bg else None
@@ -73,13 +79,52 @@ class MenuScene(Scene):
         if self.bg:
             self.bg.blit(dark, (0, 0))
         self.tick = 0
+        self.mode = sum(name is not None for name in controllers)
+        self.human_side = 0 if controllers[0] is None else 1
+        defaults = ("Bot-A", "Bot-B-Normal")
+        self.bot_choices = [BOT_NAMES.index(name or defaults[i])
+                            for i, name in enumerate(controllers)]
+        self.focus = 0
         self.assets.music("home.wav", 0.5)
+
+    def _controllers(self):
+        return tuple(BOT_NAMES[choice] if self.mode == 2 or
+                     (self.mode == 1 and side != self.human_side) else None
+                     for side, choice in enumerate(self.bot_choices))
+
+    def _rows(self):
+        if self.mode == 1:
+            bot_side = 1 - self.human_side
+            return [("HUMAN SIDE", f"P{self.human_side + 1}", None),
+                    (f"P{bot_side + 1} BOT", BOT_NAMES[self.bot_choices[bot_side]], bot_side)]
+        if self.mode == 2:
+            return [(f"P{i + 1} BOT", BOT_NAMES[choice], i)
+                    for i, choice in enumerate(self.bot_choices)]
+        return []
 
     def handle(self, events, held):
         for e in events:
-            if e.type == pygame.KEYDOWN and e.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+            if e.type != pygame.KEYDOWN:
+                continue
+            if e.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
                 self.assets.play("Select")
-                self.game.change(CharSelectScene(self.game))
+                self.game.change(CharSelectScene(self.game, self._controllers()))
+                return
+            if e.key in (pygame.K_UP, pygame.K_w, pygame.K_DOWN, pygame.K_s):
+                step = -1 if e.key in (pygame.K_UP, pygame.K_w) else 1
+                self.focus = (self.focus + step) % (1 + len(self._rows()))
+                self.assets.play("Select", 0.4)
+            elif e.key in (pygame.K_LEFT, pygame.K_a, pygame.K_RIGHT, pygame.K_d):
+                step = -1 if e.key in (pygame.K_LEFT, pygame.K_a) else 1
+                if self.focus == 0:
+                    self.mode = (self.mode + step) % len(self.MODES)
+                else:
+                    side = self._rows()[self.focus - 1][2]
+                    if side is None:
+                        self.human_side ^= 1
+                    else:
+                        self.bot_choices[side] = (self.bot_choices[side] + step) % len(BOT_NAMES)
+                self.assets.play("Select", 0.4)
 
     def update(self):
         self.tick += 1
@@ -94,30 +139,50 @@ class MenuScene(Scene):
         title1 = outlined(big, "STREET", (255, 220, 60), px=4)
         title2 = outlined(big, "FIGHTER", (255, 120, 40), px=4)
         # gentle floating bob
-        bob = int(4 * __import__("math").sin(self.tick / 30))
-        surf.blit(title1, (config.CANVAS_W / 2 - title1.get_width() / 2, 110 + bob))
-        surf.blit(title2, (config.CANVAS_W / 2 - title2.get_width() / 2, 175 + bob))
+        bob = int(4 * math.sin(self.tick / 30))
+        surf.blit(title1, title1.get_rect(midtop=(config.CANVAS_W // 2, 40 + bob)))
+        surf.blit(title2, title2.get_rect(midtop=(config.CANVAS_W // 2, 105 + bob)))
         sub = outlined(self.assets.font(14), "PYTHON EDITION", (200, 200, 220))
-        surf.blit(sub, (config.CANVAS_W / 2 - sub.get_width() / 2, 250))
+        surf.blit(sub, sub.get_rect(midtop=(config.CANVAS_W // 2, 181)))
 
-        if (self.tick // 32) % 2 == 0:
-            prompt = outlined(self.assets.font(20), "PRESS ENTER", (255, 255, 255), px=3)
-            surf.blit(prompt, (config.CANVAS_W / 2 - prompt.get_width() / 2, 370))
+        gold = (255, 220, 60)
+        muted = (180, 185, 210)
+        for i, mode in enumerate(self.MODES):
+            rect = pygame.Rect(102 + i * 256, 233, 244, 48)
+            selected = i == self.mode
+            pygame.draw.rect(surf, (64, 42, 28) if selected else (22, 22, 42),
+                             rect, border_radius=6)
+            if selected:
+                pygame.draw.rect(surf, gold, rect, 3 if self.focus == 0 else 1, border_radius=6)
+            label = outlined(self.assets.font(12), mode, gold if selected else muted)
+            surf.blit(label, label.get_rect(center=rect.center))
 
-        hint = outlined(self.assets.font(10),
-                        "P1: WASD + JKUI, L BLOCK    P2: ARROWS + NUMPAD 4/5/1/2, 6 BLOCK",
-                        (170, 170, 190))
-        surf.blit(hint, (config.CANVAS_W / 2 - hint.get_width() / 2, config.CANVAS_H - 40))
+        for i, (label, value, _) in enumerate(self._rows(), 1):
+            rect = pygame.Rect(228, 296 + (i - 1) * 50, 504, 42)
+            selected = self.focus == i
+            pygame.draw.rect(surf, (22, 22, 42), rect, border_radius=5)
+            if selected:
+                pygame.draw.rect(surf, gold, rect, 2, border_radius=5)
+            desc = outlined(self.assets.font(12), label, muted)
+            choice = outlined(self.assets.font(14), f"< {value} >", gold if selected else (255, 255, 255))
+            surf.blit(desc, desc.get_rect(midleft=(rect.left + 18, rect.centery)))
+            surf.blit(choice, choice.get_rect(midright=(rect.right - 18, rect.centery)))
+
+        hint = ("LEFT/RIGHT: CHANGE    UP/DOWN: SELECT ROW    ENTER: CONTINUE"
+                if self.mode else "LEFT/RIGHT: CHANGE MODE    ENTER: CONTINUE")
+        text = outlined(self.assets.font(12), hint, (225, 225, 240))
+        surf.blit(text, text.get_rect(center=(config.CANVAS_W // 2, 470)))
 
 
 # CHAR SELECT
 class CharSelectScene(Scene):
     CHARS = ["ryu", "ken"]
 
-    def __init__(self, game):
+    def __init__(self, game, controllers=HUMAN, picks=(0, 1)):
         super().__init__(game)
         self.bg = self.assets.char_select_bg()
-        self.cursor = [0, 1]
+        self.controllers = controllers
+        self.cursor = list(picks)
         self.confirmed = [False, False]
         self.done_timer = 0
         self.portraits = {}
@@ -133,8 +198,11 @@ class CharSelectScene(Scene):
             if e.type != pygame.KEYDOWN:
                 continue
             if e.key == pygame.K_ESCAPE:
-                self.game.change(MenuScene(self.game))
+                self.game.change(MenuScene(self.game, self.controllers))
                 return
+            if self.controllers != HUMAN:
+                self._handle_solo_pick(e.key)
+                continue
             # P1
             if not self.confirmed[0]:
                 if e.key in (pygame.K_a, pygame.K_d):
@@ -152,13 +220,25 @@ class CharSelectScene(Scene):
                     self.confirmed[1] = True
                     self.assets.play("Select")
 
+    def _handle_solo_pick(self, key):
+        if all(self.confirmed):
+            return
+        side = self.confirmed.index(False)
+        if key in (pygame.K_a, pygame.K_d, pygame.K_LEFT, pygame.K_RIGHT):
+            self.cursor[side] ^= 1
+            self.assets.play("Select", 0.4)
+        elif key in (pygame.K_RETURN, pygame.K_KP_ENTER, pygame.K_j, pygame.K_KP4):
+            self.confirmed[side] = True
+            self.assets.play("Select")
+
     def update(self):
         self.bg.tick()
         if all(self.confirmed):
             self.done_timer += 1
             if self.done_timer >= 50:
                 self.game.change(MapSelectScene(
-                    self.game, self.CHARS[self.cursor[0]], self.CHARS[self.cursor[1]]))
+                    self.game, self.CHARS[self.cursor[0]], self.CHARS[self.cursor[1]],
+                    self.controllers))
 
     def draw(self, surf):
         surf.blit(self.bg.frame, (0, 0))
@@ -208,8 +288,8 @@ class CharSelectScene(Scene):
                         name, (160, int(name.get_height() * 160 / name.get_width())))
                     nx = 60 if side == 0 else config.CANVAS_W - 60 - n.get_width()
                     surf.blit(n, (nx, 170 + img.get_height() + 12))
-            label = outlined(self.assets.font(12),
-                             "READY!" if self.confirmed[pl] else f"P{pl + 1} SELECT",
+            role = self.controllers[pl] or f"P{pl + 1}"
+            label = outlined(self.assets.font(12), role + (" READY" if self.confirmed[pl] else ""),
                              color)
             lx = 60 if side == 0 else config.CANVAS_W - 60 - label.get_width()
             surf.blit(label, (lx, 140))
@@ -217,15 +297,24 @@ class CharSelectScene(Scene):
         if all(self.confirmed):
             vs = outlined(self.assets.font(44), "VS", (255, 80, 40), px=4)
             surf.blit(vs, (config.CANVAS_W / 2 - vs.get_width() / 2, 400))
+        else:
+            if self.controllers == HUMAN:
+                hint = "P1: A/D + J    P2: LEFT/RIGHT + NUM4 OR RSHIFT"
+            else:
+                side = self.confirmed.index(False)
+                hint = f"P{side + 1}  LEFT/RIGHT: CHOOSE    ENTER: CONFIRM"
+            text = outlined(self.assets.font(11), hint, (225, 225, 240))
+            surf.blit(text, text.get_rect(center=(config.CANVAS_W // 2, config.CANVAS_H - 30)))
 
 
 # MAP SELECT
 class MapSelectScene(Scene):
     THUMB = (250, 130)
 
-    def __init__(self, game, p1_char, p2_char):
+    def __init__(self, game, p1_char, p2_char, controllers=HUMAN):
         super().__init__(game)
         self.p1_char, self.p2_char = p1_char, p2_char
+        self.controllers = controllers
         self.thumbs = [self.assets.map_thumb(i, self.THUMB) for i in range(1, 7)]
         self.cursor = 0
 
@@ -234,7 +323,8 @@ class MapSelectScene(Scene):
             if e.type != pygame.KEYDOWN:
                 continue
             if e.key == pygame.K_ESCAPE:
-                self.game.change(CharSelectScene(self.game))
+                picks = tuple(CharSelectScene.CHARS.index(char) for char in (self.p1_char, self.p2_char))
+                self.game.change(CharSelectScene(self.game, self.controllers, picks))
                 return
             col, row = self.cursor % 3, self.cursor // 3
             if e.key in (pygame.K_a, pygame.K_LEFT):
@@ -247,7 +337,7 @@ class MapSelectScene(Scene):
                 self.assets.play("Select")
                 pygame.mixer.music.fadeout(400)
                 self.game.change(FightScene(self.game, self.p1_char,
-                                            self.p2_char, self.cursor + 1))
+                                            self.p2_char, self.cursor + 1, self.controllers))
                 return
             new = row * 3 + col
             if new != self.cursor:
@@ -292,17 +382,20 @@ class MapSelectScene(Scene):
 
 # FIGHT
 class FightScene(Scene):
-    def __init__(self, game, p1_char, p2_char, map_index):
+    def __init__(self, game, p1_char, p2_char, map_index, controllers=HUMAN):
         super().__init__(game)
         a = self.assets
         self.map_index = map_index
         self.chars = (p1_char, p2_char)
+        self.controllers = controllers
         self.bg = a.stage_bg(map_index)
         self.fighters = [
             Fighter(p1_char, a.characters[p1_char], 280, 1, P1_CONTROLS, a),
             Fighter(p2_char, a.characters[p2_char], config.CANVAS_W - 280, -1, P2_CONTROLS, a),
         ]
-        self.hud = HUD(a, [p1_char.upper(), p2_char.upper()])
+        self._reset_bots()
+        labels = [name or f"P{i + 1}" for i, name in enumerate(controllers)]
+        self.hud = HUD(a, [f"{char.upper()}  {label}" for char, label in zip(self.chars, labels)])
         self.announcer = Announcer(a)
         self.effects = Effects()
         self.round_num = 1
@@ -316,6 +409,7 @@ class FightScene(Scene):
         self.hitstop = 0
         self.paused = False
         self.winner = None
+        self.held = NO_KEYS
         self.pressed = set()
         self.tick = 0
         a.music("fight_theme.wav", 0.4)
@@ -331,14 +425,15 @@ class FightScene(Scene):
             if e.key == pygame.K_ESCAPE and self.state in ("intro", "fight"):
                 self.paused = not self.paused
             elif self.paused and e.key == pygame.K_q:
-                self.game.change(MenuScene(self.game))
+                self.game.change(MenuScene(self.game, self.controllers))
                 return
             elif self.state == "end":
                 if e.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
-                    self.game.change(MenuScene(self.game))
+                    self.game.change(MenuScene(self.game, self.controllers))
                     return
                 if e.key == pygame.K_r:
-                    self.game.change(FightScene(self.game, *self.chars, self.map_index))
+                    self.game.change(FightScene(self.game, *self.chars, self.map_index,
+                                                self.controllers))
                     return
         if self.paused:
             self.pressed = set()
@@ -372,9 +467,11 @@ class FightScene(Scene):
                     f.fireball_active = any(p.owner == i for p in self.projectiles)
                 self._world(True)
                 self._resolve_hits()
-                self._update_projectiles()
+                if self.state == "fight":
+                    self._update_projectiles()
                 self._push_apart()
-            self._tick_clock()
+            if self.state == "fight":
+                self._tick_clock()
             self._update_combo()
 
         elif self.state == "ko":
@@ -398,13 +495,19 @@ class FightScene(Scene):
     def _world(self, with_inputs):
         f1, f2 = self.fighters
         if with_inputs:
-            f1.update(self.held, self.pressed, f2)
-            f2.update(self.held, self.pressed, f1)
+            inputs = [bot.update(f, self.fighters[1 - i]) if bot else (self.held, self.pressed)
+                      for i, (f, bot) in enumerate(zip(self.fighters, self.bots))]
+            f1.update(*inputs[0], f2)
+            f2.update(*inputs[1], f1)
         else:
             f1.update(NO_KEYS, NO_PRESSED, f2)
             f2.update(NO_KEYS, NO_PRESSED, f1)
         for f in self.fighters:
             f.x = max(config.STAGE_MARGIN, min(config.CANVAS_W - config.STAGE_MARGIN, f.x))
+
+    def _reset_bots(self):
+        self.bots = [BotInput(name, f.controls) if name else None
+                     for name, f in zip(self.controllers, self.fighters)]
 
     def _push_apart(self):
         f1, f2 = self.fighters
@@ -506,6 +609,7 @@ class FightScene(Scene):
                 self.hud.set_combo(p.owner, self.combo[p.owner])
                 if result == "ko":
                     self._ko(p.owner)
+                    return
             elif p.rect.right < -40 or p.rect.left > config.CANVAS_W + 40:
                 self.projectiles.remove(p)
 
@@ -556,7 +660,7 @@ class FightScene(Scene):
             self.t = 0
             w = self.wins.index(max(self.wins))
             self.announcer.clear()
-            self.announcer.say(f"{self.chars[w].upper()} WINS!",
+            self.announcer.say(f"P{w + 1} {self.chars[w].upper()} WINS!",
                                P1_COLOR if w == 0 else P2_COLOR,
                                life=10 ** 9, size=40)
             self.assets.play("p1win" if w == 0 else "p2win")
@@ -570,6 +674,7 @@ class FightScene(Scene):
         self.announcer.clear()
         for f in self.fighters:
             f.reset()
+        self._reset_bots()
         self.hud.set_combo(0, 0)
         self.hud.set_combo(1, 0)
         self.state = "intro"

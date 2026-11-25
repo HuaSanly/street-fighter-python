@@ -17,6 +17,8 @@ class Game:
         self.screen = pygame.display.set_mode(
             (config.CANVAS_W, config.CANVAS_H),
             pygame.SCALED | pygame.RESIZABLE, vsync=1)
+        # Windows input methods can consume gameplay keys in SDL's text input mode.
+        pygame.key.stop_text_input()
         pygame.display.set_caption("Street Fighter — Python Edition")
         self.assets = Assets()
         icon = self.assets.images.get("logo")
