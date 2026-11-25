@@ -116,3 +116,18 @@ class BotMatchTests(unittest.TestCase):
                             break
                     self.assertTrue(attacked)
                     self.assertLessEqual(opponent.health, config.MAX_HEALTH - 20)
+
+    def test_adaptive_bot_keeps_learning_across_rounds_and_resets_for_new_match(self):
+        lineup = ("Bot-C", "Bot-A")
+        fight = FightScene(self.game, "ryu", "ken", 1, lineup)
+        for _ in range(180):
+            fight.update()
+        controller = fight.bots[0].controller
+        observations = controller.model.observations
+        self.assertGreater(observations, 0)
+        fight._next_round()
+        self.assertIs(fight.bots[0].controller, controller)
+        self.assertEqual(controller.model.observations, observations)
+        self.assertIsNone(controller.observer.previous)
+        rematch = FightScene(self.game, "ryu", "ken", 1, lineup)
+        self.assertEqual(rematch.bots[0].controller.model.observations, 0)

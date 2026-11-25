@@ -378,7 +378,8 @@ class FightScene(Scene):
             Fighter(p1_char, a.characters[p1_char], 280, 1, P1_CONTROLS, a),
             Fighter(p2_char, a.characters[p2_char], config.CANVAS_W - 280, -1, P2_CONTROLS, a),
         ]
-        self._reset_bots()
+        self.bots = [BotInput(name, fighter.controls) if name else None
+                     for name, fighter in zip(controllers, self.fighters)]
         labels = [name or f"P{i + 1}" for i, name in enumerate(controllers)]
         self.hud = HUD(a, [f"{char.upper()}  {label}" for char, label in zip(self.chars, labels)])
         self.announcer = Announcer(a)
@@ -463,19 +464,17 @@ class FightScene(Scene):
         if self.combat.hitstop:
             self.combat.step()
         else:
-            inputs = [bot.update(fighter, self.fighters[1 - index])
-                      if bot else (self.held, self.pressed)
-                      for index, (fighter, bot) in enumerate(zip(self.fighters, self.bots))]
-            self.combat.step(inputs)
+            inputs = [bot.update(self.combat, index) if bot else (self.held, self.pressed)
+                      for index, bot in enumerate(self.bots)]
+            actions = self.combat.step(inputs)
+            for index, bot in enumerate(self.bots):
+                if bot:
+                    bot.observe(actions[1 - index])
         for index, count in enumerate(self.combat.combo):
             if count != self.hud.combo[index]:
                 self.hud.set_combo(index, count)
         if self.combat.finished:
             self._show_round_result()
-
-    def _reset_bots(self):
-        self.bots = [BotInput(name, f.controls) if name else None
-                     for name, f in zip(self.controllers, self.fighters)]
 
     def _show_round_result(self):
         self.state = "ko"
@@ -512,7 +511,9 @@ class FightScene(Scene):
         self.announcer.clear()
         for f in self.fighters:
             f.reset()
-        self._reset_bots()
+        for bot in self.bots:
+            if bot:
+                bot.reset_round()
         self.hud.set_combo(0, 0)
         self.hud.set_combo(1, 0)
         self.state = "intro"

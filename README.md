@@ -58,12 +58,22 @@ settings. Press Enter to continue to fighter and stage selection.
 | AI vs AI | Choose a bot independently for P1 and P2, then watch the match. |
 
 In either AI mode, use Left/Right and Enter to pick P1's fighter, then P2's.
-The bot choices are **Bot-A**, **Bot-B-Easy**, **Bot-B-Normal**, and **Bot-B-Hard**.
+The bot choices are **Bot-A**, **Bot-B-Easy**, **Bot-B-Normal**, **Bot-B-Hard**, and **Bot-C**.
+Bot-C learns the opponent's next-action probabilities in neutral, near a wall,
+and around knockdown recovery. It uses a short Monte Carlo lookahead to pick
+its next input. It uses the previous action when recent predictions improve
+with that extra history. The opponent model carries across rounds and starts
+fresh for each match.
 The fight HUD shows each bot by name. Press **R** after the match to replay the
 same setup.
 
 Run `python -m unittest discover -s tests -v` to check the match flows and bot
 combat inputs without opening a window.
+
+Run `python -m Bot.bot_c.benchmark --pairs 2 --seconds 15` to compare Bot-C's
+rule-only, fixed-prior, zero-order, first-order, and adaptive variants. The benchmark
+swaps sides for every seed and reports round points, health, decision time, and
+prediction log loss by context. Add `--realtime` to apply the live search budget.
 
 ## 🎮 Controls
 
@@ -101,13 +111,15 @@ street-fighter-python/
 ├── assets/              # sprites, stages, sounds, music, font
 ├── Bot/
 │   ├── bot_a/           # Gothicvania-inspired tactical controller
-│   └── bot_b/           # Tepelekas CPUController and its MIT notice
+│   ├── bot_b/           # Tepelekas CPUController and its MIT notice
+│   └── bot_c/           # online Markov opponent model + Monte Carlo planner
 └── sf/
     ├── config.py        # all tunable constants (speed, damage, health...)
     ├── assets.py        # data-driven sprite sheet loader, GIF stages
     ├── data/characters.json  # every animation: file, frames, timing
     ├── animation.py     # tick-based animation player
     ├── combat.py        # attack frame data + special move definitions
+    ├── combat_round.py  # shared live and simulated combat step
     ├── fighter.py       # physics, input buffer, hit reactions, boxes
     ├── effects.py       # particles, fireballs, screen shake
     ├── ui.py            # health bars, timer, combos, announcer

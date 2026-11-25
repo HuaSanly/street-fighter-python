@@ -36,6 +36,7 @@ class Fighter:
         self.health = config.MAX_HEALTH
         self.hitstun = 0
         self.blockstun = 0
+        self.knocked_down = False
         self.blocking = False
         self.attack = None
         self.attack_tick = 0
@@ -59,6 +60,7 @@ class Fighter:
         self.on_ground = True
         self.health = config.MAX_HEALTH
         self.hitstun = self.blockstun = 0
+        self.knocked_down = False
         self.blocking = False
         self.attack = None
         self.attack_tick = 0
@@ -76,8 +78,26 @@ class Fighter:
         self.attack = None
         self.anim.set("win", force=True)
 
-    # Update
+    def control_mode(self):
+        """Inputs available on the next active tick, including the unlock frame."""
+        if self.dying or self.win_pose or self.hitstun > 1 or self.blockstun > 1:
+            return None
+        grounded = self.y + self.vy >= config.GROUND_Y
+        landing = grounded and not self.on_ground
+        if landing and self.special == "shoryuken":
+            return None
+        attack = self.attack
+        if attack and not (landing and self.anim.name in AIR_ANIMS):
+            if self.special == "shoryuken" and not grounded:
+                return None
+            if not (self.anim.finished or self.anim.name != attack.anim):
+                if attack.cancel and self.hit_connected:
+                    return "ground_cancel" if grounded else "air_cancel"
+                return None
+        return "ground" if grounded else "air"
+
     def update(self, held, pressed, opponent):
+        """Advance one active tick and report the input that took effect."""
         self.age += 1
         if self.flash:
             self.flash -= 1
@@ -103,6 +123,7 @@ class Fighter:
         if self.hitstun or self.blockstun:
             self.anim.tick()
             return
+        self.knocked_down = False
 
         # auto-face the opponent while free on the ground
         if self.on_ground and not self.attack:
@@ -115,19 +136,20 @@ class Fighter:
         # ongoing attack locks the fighter (unless a light cancels on hit)
         if self.attack:
             self.attack_tick += 1
-            if self.attack.cancel and self.hit_connected:
-                self._try_attack(pressed, held)
+            accepted = None
+            if self.attack.cancel and self.hit_connected and self._try_attack(pressed, held):
+                accepted = self.special or self.attack.anim
             # shoryuken holds its final pose until the fighter lands
             if self.special == "shoryuken" and not self.on_ground:
                 if not self.anim.finished:
                     self.anim.tick()
-                return
+                return accepted
             if self.attack and (self.anim.finished or self.anim.name != self.attack.anim):
                 self.attack = None
                 self.special = None
             if self.attack:
                 self.anim.tick()
-                return
+                return accepted
 
         # blocking: hold the block key while grounded (frozen guard pose)
         self.blocking = self.on_ground and held[c["block"]]
@@ -135,11 +157,11 @@ class Fighter:
             self.vx = 0
             self.anim.set("parry_b")
             self.anim.frame_index = 0
-            return
+            return "guard"
 
         if self._try_attack(pressed, held):
             self.anim.tick()
-            return
+            return self.special or self.attack.anim
 
         # jump — straight, or flip when a direction is held
         if self.on_ground and c["jump"] in pressed:
@@ -156,7 +178,9 @@ class Fighter:
                 self.vx = 0
             self.sounds.play("jump")
             self.anim.tick()
-            return
+            if self.vx:
+                return "jump_in" if (self.vx > 0) == (opponent.x >= self.x) else "jump_out"
+            return "jump"
 
         if not self.on_ground:
             # limited air drift on straight jumps; flips keep their momentum
@@ -167,14 +191,16 @@ class Fighter:
                 if held[c["right"]]:
                     self.vx = config.AIR_MOVE_SPEED
             self.anim.tick()
-            return
+            if self.anim.name == "jump" and self.vx:
+                return "advance" if (self.vx > 0) == (opponent.x >= self.x) else "retreat"
+            return "wait"
 
         # crouch: hold down while grounded
         if held[c["down"]]:
             self.vx = 0
             self.anim.set("crouch")
             self.anim.tick()
-            return
+            return "crouch"
 
         # grounded movement
         self.vx = 0
@@ -188,6 +214,9 @@ class Fighter:
         else:
             self.anim.set("idle")
         self.anim.tick()
+        if self.vx:
+            return "advance" if (self.vx > 0) == (opponent.x >= self.x) else "retreat"
+        return "wait"
 
     def _physics(self):
         self.x += self.vx
@@ -361,7 +390,8 @@ class Fighter:
                 self.on_ground = False
             return "ko"
 
-        if atk.heavy or not self.on_ground:
+        self.knocked_down = atk.heavy or not self.on_ground
+        if self.knocked_down:
             self.anim.set("knockback", force=True)
             self.hitstun = 48  # knockdown: knockback -> recover
         elif self.is_crouching:
