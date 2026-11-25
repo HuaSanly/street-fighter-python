@@ -1,15 +1,13 @@
 """Game scenes: menu -> character select -> map select -> fight."""
 import math
-import random
 
 import pygame
 
 from Bot import BOT_NAMES, BotInput
 
 from . import config
-from .combat import (HITSTOP_LIGHT, HITSTOP_HEAVY, HITSTOP_BLOCK,
-                     SPECIALS, FIREBALL_SPEED)
-from .effects import Effects, Fireball
+from .combat_round import CombatRound, NO_KEYS
+from .effects import Effects
 from .fighter import Fighter
 from .ui import HUD, Announcer, outlined
 
@@ -22,22 +20,9 @@ P2_CONTROLS = {"left": pygame.K_LEFT, "right": pygame.K_RIGHT, "jump": pygame.K_
                "lp": pygame.K_KP4, "hp": pygame.K_KP5, "lk": pygame.K_KP1,
                "hk": pygame.K_KP2, "block": pygame.K_KP6}
 
-# fireball palettes (dark, mid, light): Ryu blue, Ken orange
-FIRE_COLORS = {"ryu": ((30, 60, 200), (80, 140, 255), (175, 215, 255)),
-               "ken": ((200, 60, 10), (255, 145, 45), (255, 220, 150))}
-
 P1_COLOR = (255, 80, 60)
 P2_COLOR = (80, 140, 255)
 HUMAN = (None, None)
-
-
-class _NoKeys:
-    def __getitem__(self, _):
-        return False
-
-
-NO_KEYS = _NoKeys()
-NO_PRESSED = frozenset()
 
 
 def cover(img, size):
@@ -400,13 +385,9 @@ class FightScene(Scene):
         self.effects = Effects()
         self.round_num = 1
         self.wins = [0, 0]
-        self.combo = [0, 0]
-        self.projectiles = []
-        self.timer = config.ROUND_TIME
-        self.second_ticks = 0
+        self.combat = CombatRound(self.fighters, effects=self.effects, sounds=a)
         self.state = "intro"
         self.t = 0
-        self.hitstop = 0
         self.paused = False
         self.winner = None
         self.held = NO_KEYS
@@ -454,205 +435,65 @@ class FightScene(Scene):
             if self.t == 72:
                 self.announcer.say("FIGHT!", (255, 70, 40), life=40, size=54)
                 self.assets.play("fightFX")
-            self._world(False)
+            self.combat.step_presentation()
             if self.t >= 88:
                 self.state = "fight"
                 self.t = 0
 
         elif self.state == "fight":
-            if self.hitstop:
-                self.hitstop -= 1
-            else:
-                for i, f in enumerate(self.fighters):
-                    f.fireball_active = any(p.owner == i for p in self.projectiles)
-                self._world(True)
-                self._resolve_hits()
-                if self.state == "fight":
-                    self._update_projectiles()
-                self._push_apart()
-            if self.state == "fight":
-                self._tick_clock()
-            self._update_combo()
+            self._fight_tick()
 
         elif self.state == "ko":
             slow = self.t < 50 and self.t % 3 != 0  # brief slow motion
-            if self.hitstop:
-                self.hitstop -= 1
+            if self.combat.hitstop:
+                self.combat.hitstop -= 1
             elif not slow:
-                self._world(False)
-                self._fly_projectiles()  # round decided: fireballs just fly out
-                self._push_apart()
+                self.combat.step_presentation(after_ko=True)
             if self.t == 85 and self.winner is not None:
                 self.fighters[self.winner].play_win()
             if self.t >= 230:
                 self._next_round()
 
         elif self.state == "end":
-            self._world(False)
+            self.combat.step_presentation()
 
         self.hud.update(self.fighters)
 
-    def _world(self, with_inputs):
-        f1, f2 = self.fighters
-        if with_inputs:
-            inputs = [bot.update(f, self.fighters[1 - i]) if bot else (self.held, self.pressed)
-                      for i, (f, bot) in enumerate(zip(self.fighters, self.bots))]
-            f1.update(*inputs[0], f2)
-            f2.update(*inputs[1], f1)
+    def _fight_tick(self):
+        if self.combat.hitstop:
+            self.combat.step()
         else:
-            f1.update(NO_KEYS, NO_PRESSED, f2)
-            f2.update(NO_KEYS, NO_PRESSED, f1)
-        for f in self.fighters:
-            f.x = max(config.STAGE_MARGIN, min(config.CANVAS_W - config.STAGE_MARGIN, f.x))
+            inputs = [bot.update(fighter, self.fighters[1 - index])
+                      if bot else (self.held, self.pressed)
+                      for index, (fighter, bot) in enumerate(zip(self.fighters, self.bots))]
+            self.combat.step(inputs)
+        for index, count in enumerate(self.combat.combo):
+            if count != self.hud.combo[index]:
+                self.hud.set_combo(index, count)
+        if self.combat.finished:
+            self._show_round_result()
 
     def _reset_bots(self):
         self.bots = [BotInput(name, f.controls) if name else None
                      for name, f in zip(self.controllers, self.fighters)]
 
-    def _push_apart(self):
-        f1, f2 = self.fighters
-        r1, r2 = f1.pushbox(), f2.pushbox()
-        if r1.colliderect(r2):
-            overlap = min(r1.right, r2.right) - max(r1.left, r2.left)
-            shift = overlap / 2 + 0.5
-            if f1.x <= f2.x:
-                f1.x -= shift
-                f2.x += shift
-            else:
-                f1.x += shift
-                f2.x -= shift
-            for f in self.fighters:
-                f.x = max(config.STAGE_MARGIN,
-                          min(config.CANVAS_W - config.STAGE_MARGIN, f.x))
-
-    def _resolve_hits(self):
-        for i in (0, 1):
-            att, vic = self.fighters[i], self.fighters[1 - i]
-            hitbox = att.get_hitbox()
-            if not hitbox or vic.dying or not hitbox.colliderect(vic.hurtbox()):
-                continue
-            att.hit_connected = True
-            atk = att.attack
-            direction = 1 if vic.x >= att.x else -1
-            was_stunned = vic.hitstun > 0
-            result = vic.take_hit(atk, direction)
-
-            hurt = vic.hurtbox()
-            pos = (max(hurt.left, min(hitbox.centerx, hurt.right)), hitbox.centery)
-
-            if result == "block":
-                self.effects.hit_spark(pos, blocked=True)
-                self.assets.play("punch", 0.25)
-                self.hitstop = HITSTOP_BLOCK
-                continue
-
-            self.assets.play(atk.sound, 0.6)
-            self.effects.hit_spark(pos, heavy=atk.heavy)
-            self.hitstop = HITSTOP_HEAVY if atk.heavy else HITSTOP_LIGHT
-            if atk.heavy:
-                self.effects.shake(7, 14)
-            self.combo[i] = self.combo[i] + 1 if was_stunned else 1
-            self.hud.set_combo(i, self.combo[i])
-            if result == "ko":
-                self._ko(i)
-
-    def _fly_projectiles(self):
-        for p in self.projectiles[:]:
-            p.update(self.effects)
-            if p.rect.right < -40 or p.rect.left > config.CANVAS_W + 40:
-                self.projectiles.remove(p)
-
-    def _update_projectiles(self):
-        # spawn: hadouken releases its fireball on the startup tick,
-        # shoryuken leaves an ember trail while rising
-        for i, f in enumerate(self.fighters):
-            palette = FIRE_COLORS.get(f.name, FIRE_COLORS["ryu"])
-            if f.special == "hadouken" and f.attack and \
-                    f.attack_tick == f.attack.startup and not f.fireball_active:
-                self.projectiles.append(Fireball(
-                    f.x + f.facing * 62, f.y - 128, f.facing, i, palette,
-                    SPECIALS["hadouken"], FIREBALL_SPEED))
-                self.assets.play("punch", 0.5)
-                f.fireball_active = True
-            if f.special == "shoryuken" and not f.on_ground and f.vy < 2:
-                for _ in range(2):
-                    self.effects.ember(f.x + f.facing * 20 + random.uniform(-14, 14),
-                                       f.y - random.uniform(50, 190), palette)
-
-        # projectile vs projectile: they cancel out in a burst
-        live = self.projectiles
-        if len(live) >= 2 and live[0].owner != live[1].owner and \
-                live[0].rect.colliderect(live[1].rect):
-            self.effects.hit_spark(live[0].rect.center, heavy=True)
-            self.effects.hit_spark(live[1].rect.center)
-            self.assets.play("punch", 0.5)
-            self.projectiles.clear()
-            return
-
-        for p in self.projectiles[:]:
-            p.update(self.effects)
-            vic = self.fighters[1 - p.owner]
-            if not vic.dying and p.rect.colliderect(vic.hurtbox()):
-                was_stunned = vic.hitstun > 0
-                result = vic.take_hit(p.attack, p.direction)
-                pos = p.rect.center
-                self.projectiles.remove(p)
-                if result == "block":
-                    self.effects.hit_spark(pos, blocked=True)
-                    self.assets.play("punch", 0.25)
-                    self.hitstop = HITSTOP_BLOCK
-                    continue
-                self.assets.play("punch", 0.6)
-                self.effects.hit_spark(pos)
-                self.hitstop = HITSTOP_LIGHT
-                self.combo[p.owner] = self.combo[p.owner] + 1 if was_stunned else 1
-                self.hud.set_combo(p.owner, self.combo[p.owner])
-                if result == "ko":
-                    self._ko(p.owner)
-                    return
-            elif p.rect.right < -40 or p.rect.left > config.CANVAS_W + 40:
-                self.projectiles.remove(p)
-
-    def _update_combo(self):
-        for i in (0, 1):
-            opp = self.fighters[1 - i]
-            if self.combo[i] and not opp.hitstun and not opp.dying:
-                self.combo[i] = 0
-                self.hud.set_combo(i, 0)
-
-    def _tick_clock(self):
-        self.second_ticks += 1
-        if self.second_ticks >= 60:
-            self.second_ticks = 0
-            self.timer -= 1
-            if self.timer <= 0:
-                self._time_up()
-
-    def _ko(self, winner):
+    def _show_round_result(self):
         self.state = "ko"
         self.t = 0
-        self.winner = winner
-        self.wins[winner] += 1
+        self.winner = self.combat.winner
+        if self.winner is not None:
+            self.wins[self.winner] += 1
         self.announcer.clear()
+        if self.combat.timed_out:
+            self.announcer.say("TIME UP", (255, 220, 60), life=120, size=44)
+            if self.winner is None:
+                self.announcer.say("DRAW", (200, 200, 220), life=120, size=30,
+                                   y=config.CANVAS_H / 2 + 10)
+            return
         self.announcer.say("K.O.", (255, 60, 40), life=150, size=68)
         self.assets.play("KO")
         self.assets.play("death", 0.7)
         self.effects.shake(14, 26)
-        self.hitstop = 16
-
-    def _time_up(self):
-        h1, h2 = self.fighters[0].health, self.fighters[1].health
-        self.state = "ko"
-        self.t = 0
-        self.announcer.clear()
-        self.announcer.say("TIME UP", (255, 220, 60), life=120, size=44)
-        if h1 == h2:
-            self.winner = None
-            self.announcer.say("DRAW", (200, 200, 220), life=120, size=30,
-                               y=config.CANVAS_H / 2 + 10)
-        else:
-            self.winner = 0 if h1 > h2 else 1
-            self.wins[self.winner] += 1
 
     def _next_round(self):
         if max(self.wins) >= config.ROUNDS_TO_WIN:
@@ -666,11 +507,8 @@ class FightScene(Scene):
             self.assets.play("p1win" if w == 0 else "p2win")
             return
         self.round_num += 1
-        self.timer = config.ROUND_TIME
-        self.second_ticks = 0
-        self.combo = [0, 0]
+        self.combat = CombatRound(self.fighters, effects=self.effects, sounds=self.assets)
         self.winner = None
-        self.projectiles.clear()
         self.announcer.clear()
         for f in self.fighters:
             f.reset()
@@ -691,10 +529,10 @@ class FightScene(Scene):
         for f in order:
             f.draw(surf, (int(ox), int(oy)))
 
-        for p in self.projectiles:
+        for p in self.combat.projectiles:
             p.draw(surf, (int(ox), int(oy)))
         self.effects.draw(surf, (int(ox), int(oy)))
-        self.hud.draw(surf, self.fighters, self.timer, self.wins, self.round_num)
+        self.hud.draw(surf, self.fighters, self.combat.timer, self.wins, self.round_num)
         self.announcer.draw(surf)
 
         if self.state == "intro" and self.t < 24:

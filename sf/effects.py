@@ -76,12 +76,13 @@ class Fireball:
         return pygame.Rect(int(self.x - self.W / 2), int(self.y - self.H / 2),
                            self.W, self.H)
 
-    def update(self, effects):
+    def update(self, effects=None):
         self.x += self.direction * self.speed
         self.age += 1
-        for _ in range(2):
-            effects.ember(self.x - self.direction * random.uniform(18, 34),
-                          self.y + random.uniform(-11, 11), self.palette)
+        if effects is not None:
+            for _ in range(2):
+                effects.ember(self.x - self.direction * random.uniform(18, 34),
+                              self.y + random.uniform(-11, 11), self.palette)
 
     def draw(self, surf, offset=(0, 0)):
         ox, oy = offset
