@@ -26,6 +26,49 @@ def inputs(*actions):
 
 
 class CombatRoundTests(unittest.TestCase):
+    def test_lights_cannot_cancel_into_another_normal(self):
+        lights = (("quick_punch", ("lp",)), ("crouch_punch", ("down", "lp")),
+                  ("kick_low", ("lk",)))
+        for name, keys in lights:
+            with self.subTest(attack=name):
+                fight = make_round()
+                fighter = fight.fighters[0]
+                fight.step((inputs(*keys), inputs()))
+                for _ in range(ATTACKS[name].startup):
+                    fight.step()
+                self.assertEqual(fighter.control_mode(), "ground_cancel")
+                while fight.hitstop:
+                    fight.step()
+                for follow_up in ("lp", "lk", "hk"):
+                    self.assertIsNone(fight.step((inputs(follow_up), inputs()))[0])
+                    self.assertIs(fighter.attack, ATTACKS[name])
+
+    def test_light_special_cancel_requires_a_clean_hit(self):
+        specials = (("hadouken", (("down",), ("right", "lp"))),
+                    ("shoryuken", (("right",), ("down",), ("right", "lp"))))
+        for special, sequence in specials:
+            for contact in ("hit", "block", None):
+                with self.subTest(special=special, contact=contact):
+                    fight = make_round()
+                    fighter, opponent = fight.fighters
+                    if contact is None:
+                        opponent.x += 260
+                    defender = inputs("block") if contact == "block" else inputs()
+                    fight.step((inputs("lp"), defender))
+                    for _ in range(ATTACKS["quick_punch"].startup):
+                        fight.step((inputs(), defender))
+                    self.assertEqual(fighter.attack_contact, contact)
+                    if contact == "block":
+                        self.assertTrue(fighter.hit_connected)
+                        self.assertIsNone(fighter.get_hitbox())
+                    while fight.hitstop:
+                        fight.step()
+                    for keys in sequence:
+                        actions = fight.step((inputs(*keys), defender))
+                    expected = special if contact == "hit" else None
+                    self.assertEqual(actions[0], expected)
+                    self.assertEqual(fighter.special, expected)
+
     def test_forward_round_matches_live_and_is_independent(self):
         live = make_round(Effects())
         live.projectiles.append(Fireball(125, config.GROUND_Y - 128, 1, 0,

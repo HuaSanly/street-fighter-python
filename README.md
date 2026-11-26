@@ -64,8 +64,21 @@ and around knockdown recovery. It uses a short Monte Carlo lookahead to pick
 its next input. It uses the previous action when recent predictions improve
 with that extra history. The opponent model carries across rounds and starts
 fresh for each match.
+Bot-C waits at least 22 active combat frames between independent attack starts.
+Movement, guarding, and legal hit-confirmed special cancels remain available
+under the normal combat rules.
 The fight HUD shows each bot by name. Press **R** after the match to replay the
 same setup.
+
+During a Bot-C round, its debug panel shows its situation, the opponent's three
+most likely next actions, normalized model entropy, and its latest chosen response.
+The panel uses Chinese labels. “个性化权重” is the share of the current prediction
+drawn from the learned opponent model. With two Bot-C fighters, each side has
+its own panel.
+The panel compares the model with its prior on the last 50 valid human
+decisions, showing top-one accuracy and mean log-score gain. Current KL
+measures the active forecast's divergence from its prior. The trend samples
+the same close, grounded neutral context every ten valid opponent decisions.
 
 Run `python -m unittest discover -s tests -v` to check the match flows and bot
 combat inputs without opening a window.

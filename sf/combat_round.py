@@ -119,11 +119,11 @@ class CombatRound:
             hitbox = attacker.get_hitbox()
             if not hitbox or victim.dying or not hitbox.colliderect(victim.hurtbox()):
                 continue
-            attacker.hit_connected = True
             attack = attacker.attack
             direction = 1 if victim.x >= attacker.x else -1
             was_stunned = victim.hitstun > 0
             outcome = victim.take_hit(attack, direction)
+            attacker.attack_contact = outcome
             position = None
             if self.effects is not None:
                 hurtbox = victim.hurtbox()

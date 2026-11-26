@@ -6,9 +6,12 @@ from unittest.mock import patch
 import pygame
 
 from Bot import BOT_NAMES
+from Bot.bot_c.tactics import INPUT_SEQUENCE
 from main import Game
 from sf import config
+from sf.combat import ATTACKS
 from sf.scenes import CharSelectScene, FightScene, MapSelectScene, MenuScene, NO_KEYS
+from sf.ui import BotDebugPanel
 
 
 class BotMatchTests(unittest.TestCase):
@@ -118,16 +121,95 @@ class BotMatchTests(unittest.TestCase):
                     self.assertLessEqual(opponent.health, config.MAX_HEALTH - 20)
 
     def test_adaptive_bot_keeps_learning_across_rounds_and_resets_for_new_match(self):
-        lineup = ("Bot-C", "Bot-A")
-        fight = FightScene(self.game, "ryu", "ken", 1, lineup)
-        for _ in range(180):
-            fight.update()
-        controller = fight.bots[0].controller
-        observations = controller.model.observations
-        self.assertGreater(observations, 0)
-        fight._next_round()
-        self.assertIs(fight.bots[0].controller, controller)
-        self.assertEqual(controller.model.observations, observations)
-        self.assertIsNone(controller.observer.previous)
-        rematch = FightScene(self.game, "ryu", "ken", 1, lineup)
-        self.assertEqual(rematch.bots[0].controller.model.observations, 0)
+        for opponent in (None, "Bot-A"):
+            with self.subTest(opponent=opponent):
+                lineup = ("Bot-C", opponent)
+                fight = FightScene(self.game, "ryu", "ken", 1, lineup)
+                for _ in range(180):
+                    fight.update()
+                controller = fight.bots[0].controller
+                observations = controller.model.observations
+                evaluation = controller.observer.evaluation
+                summary = evaluation.summarize_human()
+                self.assertGreater(observations, 0)
+                self.assertGreater(evaluation.valid_observations, 0)
+                self.assertEqual(summary.count > 0, opponent is None)
+                fight._next_round()
+                self.assertIs(fight.bots[0].controller, controller)
+                self.assertIs(controller.observer.evaluation, evaluation)
+                self.assertEqual(evaluation.summarize_human(), summary)
+                self.assertEqual(controller.model.observations, observations)
+                self.assertIsNone(controller.observer.previous)
+                rematch = FightScene(self.game, "ryu", "ken", 1, lineup)
+                fresh = rematch.bots[0].controller
+                self.assertEqual(fresh.model.observations, 0)
+                self.assertEqual(fresh.observer.evaluation.summarize_human().count, 0)
+                self.assertEqual(tuple(fresh.observer.evaluation.kl_trend), (0.0,))
+
+    def test_debug_panel_follows_each_adaptive_bot_side(self):
+        cases = [((None, "Bot-C"), (1,)), (("Bot-C", None), (0,)),
+                 (("Bot-C", "Bot-C"), (0, 1)), (("Bot-A", "Bot-B-Hard"), ())]
+        for lineup, expected_sides in cases:
+            with self.subTest(lineup=lineup):
+                fight = FightScene(self.game, "ryu", "ken", 1, lineup)
+                fight.state = "fight"
+                fight.update()
+                with patch("sf.ui.BotDebugPanel.draw", autospec=True) as panel:
+                    fight.draw(self.game.screen)
+                    self.assertEqual(tuple(call.args[2] for call in panel.call_args_list),
+                                     expected_sides)
+                    for call in panel.call_args_list:
+                        side, debug = call.args[2:]
+                        self.assertIs(debug.decision, fight.bots[side].controller.last_decision)
+                        self.assertAlmostEqual(sum(debug.forecast.probabilities), 1)
+                        self.assertEqual(debug.human_predictions is not None, lineup[1 - side] is None)
+                    panel.reset_mock()
+                    fight.paused = True
+                    fight.draw(self.game.screen)
+                    panel.assert_not_called()
+
+    def test_debug_panel_font_covers_chinese_action_and_context_labels(self):
+        panel = BotDebugPanel()
+        self.assertEqual(panel.MOVES.keys(), INPUT_SEQUENCE.keys())
+        characters = set("".join((*panel.MOVES.values(), *panel.PHASES.values(),
+                                 *panel.DISTANCES.values(), *panel.MODES.values(),
+                                 *panel.SOURCES.values())))
+        for character in characters:
+            with self.subTest(character=character):
+                self.assertIsNotNone(panel.body.metrics(character)[0])
+
+    def test_standing_heavy_punch_leaves_time_to_guard_at_either_wall(self):
+        move = ATTACKS["punch"]
+        for side in (0, 1):
+            for contact_tick in (move.startup, move.startup + move.active - 1):
+                with self.subTest(side=side, contact_tick=contact_tick):
+                    fight = FightScene(self.game, "ryu", "ken", 1)
+                    attacker, victim = fight.fighters[side], fight.fighters[1 - side]
+                    edge = config.CANVAS_W - config.STAGE_MARGIN if side == 0 else config.STAGE_MARGIN
+                    toward = 1 if side == 0 else -1
+                    victim.x = edge
+                    attacker.x = edge - 250 * toward
+                    first_hit = first_guard = second_hit = None
+                    for tick in range(150):
+                        if tick == contact_tick:
+                            attacker.x = edge - 100 * toward
+                        attack_keys = dict.fromkeys(attacker.controls.values(), False)
+                        guard_keys = dict.fromkeys(victim.controls.values(), False)
+                        guard_keys[victim.controls["block"]] = first_hit is not None
+                        pair = [(guard_keys, set())] * 2
+                        pair[side] = (attack_keys, {attacker.controls["hp"]})
+                        health = victim.health
+                        actions = fight.combat.step(pair)
+                        if actions and actions[1 - side] == "guard" and first_guard is None:
+                            first_guard = tick
+                        if victim.health < health:
+                            if first_hit is None:
+                                first_hit = tick
+                            else:
+                                second_hit = tick
+                                self.assertEqual(attacker.attack_contact, "block")
+                                break
+                    self.assertEqual(first_hit, contact_tick)
+                    self.assertIsNotNone(first_guard)
+                    self.assertIsNotNone(second_hit)
+                    self.assertLess(first_guard, second_hit)

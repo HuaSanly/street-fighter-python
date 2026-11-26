@@ -40,7 +40,7 @@ class Fighter:
         self.blocking = False
         self.attack = None
         self.attack_tick = 0
-        self.hit_connected = False
+        self.attack_contact = None
         self.flash = 0
         self.dying = False
         self.win_pose = False
@@ -64,7 +64,7 @@ class Fighter:
         self.blocking = False
         self.attack = None
         self.attack_tick = 0
-        self.hit_connected = False
+        self.attack_contact = None
         self.flash = 0
         self.dying = False
         self.win_pose = False
@@ -77,6 +77,19 @@ class Fighter:
         self.win_pose = True
         self.attack = None
         self.anim.set("win", force=True)
+
+    @property
+    def hit_connected(self):
+        """Hit, block, and KO all consume the attack's one contact."""
+        return self.attack_contact is not None
+
+    def cancel_targets(self):
+        """Specials that can replace the current move before its animation ends."""
+        attack = self.attack
+        if (attack and self.attack_contact == "hit"
+                and not self.anim.finished and self.anim.name == attack.anim):
+            return attack.cancel_into
+        return ()
 
     def control_mode(self):
         """Inputs available on the next active tick, including the unlock frame."""
@@ -91,8 +104,8 @@ class Fighter:
             if self.special == "shoryuken" and not grounded:
                 return None
             if not (self.anim.finished or self.anim.name != attack.anim):
-                if attack.cancel and self.hit_connected:
-                    return "ground_cancel" if grounded else "air_cancel"
+                if grounded and self.cancel_targets():
+                    return "ground_cancel"
                 return None
         return "ground" if grounded else "air"
 
@@ -133,23 +146,22 @@ class Fighter:
         fwd_key = c["right"] if self.facing > 0 else c["left"]
         back_key = c["left"] if self.facing > 0 else c["right"]
 
-        # ongoing attack locks the fighter (unless a light cancels on hit)
+        # Ongoing attacks allow only their designated special cancels.
         if self.attack:
             self.attack_tick += 1
-            accepted = None
-            if self.attack.cancel and self.hit_connected and self._try_attack(pressed, held):
-                accepted = self.special or self.attack.anim
             # shoryuken holds its final pose until the fighter lands
             if self.special == "shoryuken" and not self.on_ground:
                 if not self.anim.finished:
                     self.anim.tick()
-                return accepted
-            if self.attack and (self.anim.finished or self.anim.name != self.attack.anim):
+                return
+            if self.anim.finished or self.anim.name != self.attack.anim:
                 self.attack = None
                 self.special = None
-            if self.attack:
+            else:
+                targets = self.cancel_targets()
+                cancelled = targets and self._try_special(pressed, held, targets)
                 self.anim.tick()
-                return accepted
+                return self.special if cancelled else None
 
         # blocking: hold the block key while grounded (frozen guard pose)
         self.blocking = self.on_ground and held[c["block"]]
@@ -285,7 +297,7 @@ class Fighter:
         self.special = name
         self.attack = atk
         self.attack_tick = 0
-        self.hit_connected = False
+        self.attack_contact = None
         self.blocking = False
         self.dir_history.clear()
         self.vx = 0
@@ -297,17 +309,23 @@ class Fighter:
         self.anim.set(atk.anim, force=True)
         return True
 
+    def _try_special(self, pressed, held, allowed=SPECIALS):
+        c = self.controls
+        if not self.on_ground or (c["lp"] not in pressed and c["hp"] not in pressed):
+            return False
+        if "shoryuken" in allowed and self._has_motion("fdf", 20):
+            return self._start_special("shoryuken")
+        if ("hadouken" in allowed and not self.fireball_active and not held[c["down"]]
+                and self._has_motion("df", 26)):
+            return self._start_special("hadouken")
+        return False
+
     def _try_attack(self, pressed, held):
+        if self._try_special(pressed, held):
+            return True
         c = self.controls
         holding_forward = held[c["right"]] if self.facing > 0 else held[c["left"]]
         holding_down = self.on_ground and held[c["down"]]
-        # motion specials take priority over normal punches
-        if self.on_ground and (c["lp"] in pressed or c["hp"] in pressed):
-            if self._has_motion("fdf", 20):          # forward, down, forward
-                return self._start_special("shoryuken")
-            if self._has_motion("df", 26) and not self.fireball_active \
-                    and not holding_down:
-                return self._start_special("hadouken")
         choice = None
         if holding_down:
             if c["lp"] in pressed or c["hp"] in pressed:
@@ -329,7 +347,7 @@ class Fighter:
             return False
         self.attack = ATTACKS[choice]
         self.attack_tick = 0
-        self.hit_connected = False
+        self.attack_contact = None
         self.blocking = False
         self.special = None
         if self.on_ground:
@@ -393,7 +411,7 @@ class Fighter:
         self.knocked_down = atk.heavy or not self.on_ground
         if self.knocked_down:
             self.anim.set("knockback", force=True)
-            self.hitstun = 48  # knockdown: knockback -> recover
+            self.hitstun = atk.knockdown_stun
         elif self.is_crouching:
             self.anim.set("crouch_hit", force=True)
             self.hitstun = atk.hitstun

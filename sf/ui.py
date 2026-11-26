@@ -109,12 +109,127 @@ class Announcer:
                              it["y"] - text.get_height() / 2))
 
 
+class BotDebugPanel:
+    WIDTH, HEIGHT, Y = 278, 218, 81
+    PHASES = {"neutral": "中立对峙", "wake": "起身防守", "pressure": "压起身",
+              "cornered": "被压版边", "corner_pressure": "版边压制"}
+    DISTANCES = {"close": "近距", "mid": "中距", "far": "远距"}
+    MODES = {"ground": "地面", "air": "空中", "ground_cancel": "地面取消",
+             "air_cancel": "空中取消", "locked": "行动锁定"}
+    MOVES = {
+        "wait": "等待", "advance": "前进", "retreat": "后撤", "guard": "防御", "crouch": "下蹲",
+        "jump": "垂直跳", "jump_in": "前跳", "jump_out": "后跳",
+        "quick_punch": "轻拳", "kick_low": "低踢", "crouch_punch": "蹲拳", "crouch_attack": "扫腿",
+        "punch": "重拳", "uppercut": "上勾拳", "upper_kick": "重踢",
+        "hadouken": "波动拳", "shoryuken": "升龙拳",
+        "air_punch": "空中拳", "air_kick": "空中踢", "punch_down": "下砸拳",
+    }
+    SOURCES = {"rules": "规则选招", "only_move": "单一候选",
+               "deadline": "规则回退（超时）", "close_scores": "规则回退（分差小）"}
+    ACCENTS = ((255, 149, 133), (123, 205, 255))
+    TEXT = (242, 245, 252)
+    MUTED = (174, 190, 213)
+
+    def __init__(self):
+        # 随游戏分发的字体子集覆盖面板用字。新增中文标签时需补充对应字形。
+        font_path = str(config.RES / "fonts" / "BotDebugSansSC.ttf")
+        self.body = pygame.font.Font(font_path, 14)
+        self.small = pygame.font.Font(font_path, 12)
+        self.card = pygame.Surface((self.WIDTH, self.HEIGHT), pygame.SRCALPHA)
+
+    def _text(self, font, text, x, y, color, *, right=False):
+        rendered = font.render(text, True, color)
+        self.card.blit(rendered, (x - rendered.get_width() if right else x, y))
+
+    def draw(self, surf, side, debug):
+        accent = self.ACCENTS[side]
+        end = self.WIDTH - 12
+        self.card.fill((0, 0, 0, 0))
+        pygame.draw.rect(self.card, (13, 19, 32, 238), self.card.get_rect(), border_radius=7)
+        pygame.draw.rect(self.card, (72, 89, 110, 248), self.card.get_rect(), 1, border_radius=7)
+        pygame.draw.line(self.card, accent, (12, 0), (end, 0), 2)
+
+        self._text(self.small, f"P{side + 1} Bot-C 调试", 12, 8, accent)
+        if debug.hitstop:
+            self._text(self.small, "命中停顿", end, 8, self.MUTED, right=True)
+        elif debug.context.danger:
+            self._text(self.small, "有威胁", end, 8, (255, 197, 112), right=True)
+        context = debug.context
+        situation = " / ".join((self.PHASES[context.phase], self.DISTANCES[context.distance],
+                                self.MODES[context.mode]))
+        self._text(self.body, situation, 12, 24, self.TEXT)
+
+        for y in (46, 128, 174):
+            pygame.draw.line(self.card, (62, 77, 98), (12, y), (end, y))
+        self._text(self.small, "对手下一步", 12, 49, self.MUTED)
+        forecast = debug.forecast
+        if forecast is None:
+            self._text(self.small, "信息熵 --", end, 49, self.MUTED, right=True)
+            self._text(self.body, "等待对手获得行动权", 12, 82, self.TEXT)
+        else:
+            self._text(self.small, f"信息熵 {forecast.entropy:.2f}", end, 49, self.MUTED, right=True)
+            ranked = sorted(zip(forecast.probabilities, forecast.actions),
+                            key=lambda entry: entry[0], reverse=True)
+            for index, (probability, action) in enumerate(ranked[:3]):
+                y = 66 + 19 * index
+                self._text(self.body, self.MOVES[action], 12, y, self.TEXT)
+                pygame.draw.rect(self.card, (44, 60, 79), (146, y + 9, 63, 6), border_radius=3)
+                width = round(probability * 63)
+                if width:
+                    pygame.draw.rect(self.card, accent, (146, y + 9, width, 6), border_radius=3)
+                self._text(self.body, f"{probability:.1%}", end, y, self.TEXT, right=True)
+
+        self._text(self.small, "最近对策", 12, 134, self.MUTED)
+        decision = debug.decision
+        if decision is None:
+            self._text(self.body, "待选招", end, 131, self.TEXT, right=True)
+        else:
+            self._text(self.body, self.MOVES[decision.action], end, 131, accent, right=True)
+            source = (f"蒙特卡洛 / {decision.trials} 轮" if decision.source == "search"
+                      else self.SOURCES[decision.source])
+            self._text(self.small, source, 12, 153, self.MUTED)
+        if forecast is not None:
+            self._text(self.small, f"个性化权重 {forecast.trust:.0%}", end, 153,
+                       self.MUTED, right=True)
+
+        self._draw_evaluation(debug, accent, end)
+
+        x = 30 if side == 0 else config.CANVAS_W - 30 - self.WIDTH
+        surf.blit(self.card, (x, self.Y))
+
+    def _draw_evaluation(self, debug, accent, end):
+        summary = debug.human_predictions
+        if summary is None:
+            self._text(self.small, "预测评估仅统计真人", 12, 178, self.MUTED)
+        else:
+            hit_rate = "--" if summary.hit_rate is None else f"{summary.hit_rate:.0%}"
+            gain = "--" if summary.gain is None else f"{summary.gain:+.2f}"
+            self._text(self.small, f"真人近 {summary.count} 次", 12, 178, self.MUTED)
+            self._text(self.small, f"首选命中 {hit_rate}", 90, 178, self.TEXT)
+            self._text(self.small, f"预测增益 {gain}", end, 178, self.TEXT, right=True)
+
+        kl = "--" if debug.current_kl is None else f"{debug.current_kl:.2f}"
+        self._text(self.small, f"当前 KL {kl}", 12, 197, self.TEXT)
+        self._text(self.small, "中立走势", 104, 197, self.MUTED)
+        left, bottom = 162, 211
+        pygame.draw.line(self.card, (62, 77, 98), (left, bottom), (end, bottom))
+        trend = debug.kl_trend
+        if len(trend) < 2:
+            pygame.draw.circle(self.card, accent, (left, bottom), 2)
+        else:
+            scale = max(0.01, max(trend))
+            points = [(left + index * (end - left) / (len(trend) - 1),
+                       bottom - 12 * value / scale) for index, value in enumerate(trend)]
+            pygame.draw.aalines(self.card, accent, False, points)
+
+
 class HUD:
     def __init__(self, assets, names):
         self.assets = assets
         self.bars = [HealthBar(i, name) for i, name in enumerate(names)]
         self.combo = [0, 0]
         self.combo_pop = [0, 0]
+        self.debug_panel = None
 
     def set_combo(self, player, count):
         self.combo[player] = count
@@ -126,7 +241,7 @@ class HUD:
             bar.update(f.health)
         self.combo_pop = [max(0, c - 1) for c in self.combo_pop]
 
-    def draw(self, surf, fighters, timer_seconds, wins, round_num):
+    def draw(self, surf, fighters, timer_seconds, wins, round_num, bot_debug=(None, None)):
         small = self.assets.font(12)
         for bar, f in zip(self.bars, fighters):
             bar.draw(surf, small, f.health)
@@ -149,6 +264,12 @@ class HUD:
                                    (int(cx), 36), 9)
                 pygame.draw.circle(surf, (240, 240, 250), (int(cx), 36), 9, width=2)
 
+        for side, debug in enumerate(bot_debug):
+            if debug is not None:
+                if self.debug_panel is None:
+                    self.debug_panel = BotDebugPanel()
+                self.debug_panel.draw(surf, side, debug)
+
         # combo counters
         for side in (0, 1):
             if self.combo[side] >= 2:
@@ -159,4 +280,5 @@ class HUD:
                 h = int(text.get_height() * pop)
                 text = pygame.transform.smoothscale(text, (w, h))
                 x = 60 if side == 0 else config.CANVAS_W - 60 - w
-                surf.blit(text, (x, 120))
+                y = BotDebugPanel.Y + BotDebugPanel.HEIGHT + 7 if bot_debug[side] else 120
+                surf.blit(text, (x, y))

@@ -14,23 +14,31 @@ class Attack:
     y: int              # hitbox center height above the feet (px)
     h: int              # hitbox height (px)
     heavy: bool = False # heavy hits: longer hitstop, screen shake, knockdown
-    cancel: bool = False  # lights can cancel into another attack on hit
+    cancel_into: tuple[str, ...] = ()  # allowed specials after a clean hit
     sound: str = "punch"
     air: bool = False
+    knockdown_stun: int = 48
+
+
+LIGHT_CANCELS = ("shoryuken", "hadouken")
 
 
 ATTACKS = {
     # Ground lights
-    "quick_punch": Attack("quick_punch", 4, 6, 12, 14, 9, 4.0, 110, 165, 52, cancel=True),
-    "kick_low":    Attack("kick_low",    6, 6, 18, 16, 10, 5.0, 155, 55, 55, cancel=True, sound="kick"),
+    "quick_punch": Attack("quick_punch", 4, 6, 12, 14, 9, 4.0, 110, 165, 52, cancel_into=LIGHT_CANCELS),
+    "kick_low":    Attack("kick_low",    6, 6, 18, 16, 10, 5.0, 155, 55, 55,
+                          cancel_into=LIGHT_CANCELS, sound="kick"),
 
     # Ground heavies
-    "punch":       Attack("punch",      8, 6, 25, 20, 12, 7.0, 145, 165, 58, heavy=True),
+    # Ryu's fastest repeat can hit 31 active ticks after a last-active-frame hit.
+    "punch":       Attack("punch",      8, 6, 25, 20, 12, 7.0, 145, 165, 58,
+                          heavy=True, knockdown_stun=30),
     "uppercut":    Attack("uppercut",   7, 7, 30, 24, 12, 7.5, 115, 180, 95, heavy=True),
     "upper_kick":  Attack("upper_kick", 10, 8, 35, 26, 14, 9.0, 165, 170, 85, heavy=True, sound="kick"),
 
     # Crouch attacks
-    "crouch_punch":  Attack("crouch_punch",  4, 5, 12, 14, 8, 3.5, 115, 95, 50, cancel=True),
+    "crouch_punch":  Attack("crouch_punch",  4, 5, 12, 14, 8, 3.5, 115, 95, 50,
+                             cancel_into=LIGHT_CANCELS),
     "crouch_attack": Attack("crouch_attack", 8, 6, 24, 26, 12, 6.5, 155, 35, 50, heavy=True, sound="kick"),
 
     # Air attacks

@@ -469,7 +469,7 @@ class FightScene(Scene):
             actions = self.combat.step(inputs)
             for index, bot in enumerate(self.bots):
                 if bot:
-                    bot.observe(actions[1 - index])
+                    bot.observe(self.combat, index, actions, human_opponent=self.bots[1 - index] is None)
         for index, count in enumerate(self.combat.combo):
             if count != self.hud.combo[index]:
                 self.hud.set_combo(index, count)
@@ -533,7 +533,11 @@ class FightScene(Scene):
         for p in self.combat.projectiles:
             p.draw(surf, (int(ox), int(oy)))
         self.effects.draw(surf, (int(ox), int(oy)))
-        self.hud.draw(surf, self.fighters, self.combat.timer, self.wins, self.round_num)
+        debug = (None, None)
+        if self.state == "fight" and not self.paused:
+            debug = tuple(bot.debug_state(self.combat, side, human_opponent=self.bots[1 - side] is None)
+                          if bot else None for side, bot in enumerate(self.bots))
+        self.hud.draw(surf, self.fighters, self.combat.timer, self.wins, self.round_num, debug)
         self.announcer.draw(surf)
 
         if self.state == "intro" and self.t < 24:
